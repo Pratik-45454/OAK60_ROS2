@@ -11,3 +11,6 @@ git clone git@github.com:Robotics-Club-Pulchowk/OAK60_ROS2.git
 cd OAK60_ROS2
 colcon build
 source install/setup.bash
+
+License
+MIT © Pratik Gyawali
