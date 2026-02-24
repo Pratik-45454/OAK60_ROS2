@@ -1,0 +1,20 @@
+# Request
+bool reset
+string trigger_roi
+int8 stage
+
+---
+# Response
+bool success
+string status
+
+string roi1_class
+string roi2_class
+string roi3_class
+
+string roi1_martial
+string roi2_martial
+string roi3_martial
+string roi4_martial
+string roi5_martial
+string roi6_martial
