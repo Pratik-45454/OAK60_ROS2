@@ -25,7 +25,7 @@ A sophisticated ROS2-based system integrating OAK-D stereo vision with YOLO obje
 
 ---
 
-##  Overview
+## Overview
 
 OAK60 ROS2 is an industrial-grade robot vision and control system that combines:
 
@@ -39,7 +39,7 @@ Perfect for robotics applications including robotic arms, picking systems, and a
 
 ---
 
-##  Features
+## Features
 
 ### Vision System
 - **Multi-Region Detection**: Simultaneous tracking across 3 configurable ROIs
@@ -63,34 +63,9 @@ Perfect for robotics applications including robotic arms, picking systems, and a
 
 ---
 
-##  System Architecture
+## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│           OAK60 ROS2 System Architecture                │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌──────────────┐         ┌──────────────────┐          │
-│  │   OAK-D      │         │  AK-60 Motor     │          │
-│  │  RGB-D       │         │  CAN Controller  │          │
-│  │  Camera      │         │                  │          │
-│  └──────┬───────┘         └────────┬─────────┘          │
-│         │                          │                     │
-│  ┌──────▼─────────────────────────▼──────┐              │
-│  │     ROS2 Node Infrastructure           │              │
-│  ├──────────────────────────────────────┤              │
-│  │ • Detector Node (Detection Service)   │              │
-│  │ • Motor Service Node (Control)        │              │
-│  │ • State Machine (ROI Management)      │              │
-│  └──────────────────────────────────────┘              │
-│         │                      │                        │
-│  ┌──────▼────────┐   ┌────────▼──────┐                │
-│  │  YOLO Models  │   │  Message      │                │
-│  │  (best.pt)    │   │  Interfaces   │                │
-│  └───────────────┘   └───────────────┘                │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-```
+The system integrates three main components: OAK-D camera input, ROS2 node infrastructure with detection and motor control services, and YOLO models for inference. The architecture follows a modular design with state machine logic for ROI management.
 
 ### Package Breakdown
 
@@ -102,7 +77,7 @@ Perfect for robotics applications including robotic arms, picking systems, and a
 
 ---
 
-##  Prerequisites
+## Prerequisites
 
 ### Hardware
 - OAK-D Stereo Camera (USB 3.1)
@@ -135,12 +110,12 @@ pyserial>=3.5
 
 ---
 
-##  Installation
+## Installation
 
 ### 1. Clone Repository
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/yourusername/OAK60_ROS2.git
+git clone https://github.com/your-repo/OAK60_ROS2.git
 cd OAK60_ROS2
 ```
 
@@ -155,7 +130,7 @@ sudo apt-get install -y \
     libusb-1.0-0-dev
 
 # Install Python dependencies
-pip3 install -r requirements.txt
+pip3 install opencv-python ultralytics depthai pyserial numpy rclpy
 ```
 
 ### 3. Build ROS2 Packages
@@ -183,7 +158,7 @@ sudo modprobe can_raw
 
 ---
 
-##  Package Structure
+## Package Structure
 
 ```
 OAK60_ROS2/
@@ -223,7 +198,7 @@ OAK60_ROS2/
 
 ---
 
-##  Configuration
+## Configuration
 
 ### ROI (Region of Interest) Configuration
 
@@ -276,7 +251,7 @@ self.model = YOLO(model_path)
 
 ---
 
-## 🎮 Usage
+## Usage
 
 ### 1. Launch Detection Service
 
@@ -358,7 +333,7 @@ ros2 run oakd_roi_detector webcam_detector_node
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### GetDetections Service
 
@@ -411,7 +386,7 @@ Response: success (bool), message (string)
 
 ---
 
-## 🔧 Development
+## Development
 
 ### Code Style
 This project follows **PEP 8** guidelines. Check and format code:
@@ -454,7 +429,7 @@ ros2 service info /get_detections
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### OAK-D Camera Not Detected
 ```bash
@@ -493,16 +468,15 @@ colcon build --event-handlers console_direct+
 
 ---
 
-## 📚 References
+## References
 
 - [ROS2 Documentation](https://docs.ros.org/en/humble/)
 - [OAK-D DepthAI SDK](https://docs.luxonis.com/projects/api/en/latest/)
 - [Ultralytics YOLO](https://docs.ultralytics.com/)
-- [AK-60 Motor Protocol](docs/AK60_MIT_Mode_Reference.md)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please follow these guidelines:
 
@@ -521,28 +495,25 @@ We welcome contributions! Please follow these guidelines:
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 👥 Authors & Maintainers
+## Authors & Maintainers
 
-- **Project Lead**: Pratik ([@yourusername](https://github.com/yourusername))
-- **Motor Control**: Your Team
-- **Vision System**: Your Team
+- **Project Lead**: Pratik Gyawali
 
 ---
 
-## 📞 Support
+## Support
 
 For questions, issues, or suggestions:
-- **Issues**: [GitHub Issues](https://github.com/yourusername/OAK60_ROS2/issues)
 - **Email**: jetsonnvidia69@gmail.com
-- **Documentation**: See [docs/](docs/) directory
+- **Issues**: Report issues on the project repository
 
 ---
 
 **Last Updated**: April 2026  
-**Status**: ✅ Active Development
+**Status**: Active Development
