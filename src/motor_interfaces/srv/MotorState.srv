@@ -1,0 +1,5 @@
+float32 state
+bool data
+---
+bool success
+string message

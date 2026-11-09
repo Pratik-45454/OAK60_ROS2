@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import threading
 import os
 import time
 import rclpy
@@ -11,28 +12,28 @@ import numpy as np
 from ultralytics import YOLO
 from ament_index_python.packages import get_package_share_directory
 from oakd_roi_detector_interfaces.srv import GetDetections
-
+from std_msgs.msg import Bool
 
 
 ROI_1 = (
-    ((174, 519), (368, 663)),
-    ((174, 519), (368, 663)),
-    ((174, 519), (368, 663)),
-    ((174, 519), (368, 663)),
+    ((785, 436), (940, 596)),
+    ((1495, 319), (1753, 597)),
+    ((1472, 588), (1707, 793)),
+    ((1287, 607), (1439, 746)),
 )
 
 ROI_2 = (
-    ((505, 574), (672, 707)),
-    ((505, 574), (672, 707)),
-    ((505, 574), (672, 707)),
-    ((505, 574), (672, 707)),
+    ((398, 508), (552, 676)),
+    ((801, 459), (1037, 719)),
+    ((776, 452), (1002, 701)),
+    ((0, 0), (0, 0)),
 )
 
 ROI_3 = (
-    ((847, 499), (991, 641)),
-    ((847, 499), (991, 641)),
-    ((847, 499), (991, 641)),
-    ((847, 499), (991, 641)),
+    ((26, 427), (190, 621)),
+    ((152, 569), (378, 770) ),
+    ((129, 576), (364, 824)),
+    ((506, 606), (632, 715)),
 )
 
 ROI1_ACTIVE = 1
@@ -40,18 +41,79 @@ ROI2_ACTIVE = 2
 ROI3_ACTIVE = 3
 
 ROI_TIMEOUT = 0.4
-ROI_TIMEOUT_SECOND = 0.20
 LOCK_FRAMES = 2
 
 
+DEPTH_TOLERANCE_FOR_FOREST = 100
+
+
+DEPTH_TARGETS_FOR_FOREST = [
+    [4.10, 3.55, 3.38],
+    [2.32, 2.2, 2.25],
+    [2.68, 2.59, 2.73],
+    [3.65, 0.55, 3.53],
+]
+
+DEPTH_TARGETS_FOR_MARTIAL = {
+    5: [0.50, 0.50, 0.50, 0.50, 0.50, 0.50],
+    6: [0.55, 0.55, 0.55, 0.55, 0.55, 0.55],
+    7: [0.60, 0.60, 0.60, 0.60, 0.60, 0.60],
+    8: [0.65, 0.65, 0.65, 0.65, 0.65, 0.65],
+    9: [0.70, 0.70, 0.70, 0.70, 0.70, 0.70],
+    10:[0.75, 0.75, 0.75, 0.75, 0.75, 0.75],
+}
+
+DEPTH_TOLERANCE_FOR_MARTIAL = 10  # THESE STUFF ARE TO BE TUNED LATER
 
 COLOR_ROI_COUNT = 6
-COLOR_ROI_SIZE = 120
-COLOR_ROI_Y = 520
-COLOR_ROI_X_START = 300
-COLOR_ROI_X_GAP = 180
-ROI_SHIFT_CONST = 40
-COLOR_PIXEL_THRESHOLD = 0.01
+COLOR_ROI_SIZE = 154
+COLOR_ROI_Y = 750
+COLOR_ROI_X_START = 729
+COLOR_ROI_X_GAP = 270
+ROI_SHIFT_CONST = 232
+
+COLOR_PIXEL_RATIO_THRESHOLD = 0.8
+
+# ── Stage 11 ──────────────────────────────────────────────────────────────────
+# TODO: replace dummy ROI coordinates with real measured values
+STAGE11_ROIS = [
+    ((558, 433) ,  (798, 630)),   # ROI 1 — tune later
+    ((807, 432),  (1056, 630)),    # ROI 2 — tune later
+    ((1063, 429),  (1321, 630)),   # ROI 3 — tune later
+    ((541, 108),  (796, 339)),   # ROI 4 — tune later
+    ((803, 118),  (1053, 332)),   # ROI 5 — tune later
+    ((1064, 125),  (1323, 328)),   # ROI 6 — tune later
+]
+
+STAGE11_DEPTH_TARGETS   = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]   # metres — tune later
+STAGE11_DEPTH_TOLERANCE = 100                               # metres — tune later
+STAGE11_BLUE_THRESHOLD  = 0.25   # min blue-pixel ratio — tune later
+STAGE11_RED_THRESHOLD   = 0.25   # min red-pixel ratio — tune later
+# ─────────────────────────────────────────────────────────────────────────────
+
+BLACK_RANGE     = ([25, 0, 0],    [112, 172, 91])
+BROWN_RANGE     = ([5, 50, 50],   [20, 255, 200])
+RED_RANGE       = ([0, 131, 36],  [4, 255, 255])
+GREEN_RANGE     = ([40, 50, 50],  [80, 255, 255])
+BLUE_RANGE      = ([100, 50, 50], [130, 255, 255])
+SPEARHEAD_RANGE = ([54, 14, 132], [179, 78, 255])
+
+
+
+MANUAL_MARTIAL_ROIS = {
+    5: [((700,700),(854,854)), ((980,700),(1134,854)), ((1260,700),(1414,854)),
+        ((1540,700),(1694,854)), ((1820,700),(1974,854)), ((2100,700),(2254,854))],
+    6: [((710,710),(864,864)), ((990,710),(1144,864)), ((1270,710),(1424,864)),
+        ((1550,710),(1704,864)), ((1830,710),(1984,864)), ((2110,710),(2264,864))],
+    7: [((720,720),(874,874)), ((1000,720),(1154,874)), ((1280,720),(1434,874)),
+        ((1560,720),(1714,874)), ((1840,720),(1994,874)), ((2120,720),(2274,874))],
+    8: [((730,730),(884,884)), ((1010,730),(1164,884)), ((1290,730),(1444,884)),
+        ((1570,730),(1724,884)), ((1850,730),(2004,884)), ((2130,730),(2284,884))],
+    9: [((230, 956),(460, 1049)), ((499, 925),(768, 1049)), ((806, 925),(998, 1049)),
+        ((1075, 894),(1305, 1018)), ((1305, 925),(1612, 1018)), ((1651, 925),(1804, 1018))],
+    10: [((-1, 916), (138, 999)), ((135, 925), (404, 1018)), ((442, 925), (634, 1018)),
+        ((749, 894), (980, 1018)), ((1018, 925), (1248, 1018)), ((1287, 925), (1479, 1018))],
+}
 
 
 def crop_roi(frame, roi):
@@ -69,46 +131,63 @@ class OAKDDetectorNode(Node):
             'models',
             'best.pt'
         )
+
         self.model = YOLO(model_path)
-
         self.stage = 1
-        self.last_stage = None
-
         self.state = ROI1_ACTIVE
-
         self.roi1_class = "none"
         self.roi2_class = "none"
         self.roi3_class = "none"
-
+        self.last_stage = None
         self.roi_count = 0
         self.roi_last = None
         self.roi_start_time = time.monotonic()
 
         self.color_state = 0
-
-        self.color_locked = [False] * COLOR_ROI_COUNT
-        self.color_result = ["no"] * COLOR_ROI_COUNT
-
+        self.color_locked = [False]*COLOR_ROI_COUNT
+        self.color_result = ["no"]*COLOR_ROI_COUNT
         self.color_count = 0
         self.color_last = None
         self.color_start_time = time.monotonic()
+
+        # Stage 11 state — 6 independently-locked ROIs, same pattern as stages 5-10
+        self.stage11_locked = [False] * 6
+        self.stage11_result = ["no"] * 6
+        self.stage11_state  = 0          # index of the currently active ROI
+        self.stage11_count  = 0
+        self.stage11_last   = None
+        self.stage11_start_time = time.monotonic()
+        self.stage11_color = "red"       # which color counts as "yes"; set via request.color
+
+        # ArUco
+        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        self.aruco_detector = cv2.aruco.ArucoDetector(aruco_dict)
+        self.aruco_pub = self.create_publisher(Bool, '/aruco_detected', 10)
 
         self.srv = self.create_service(
             GetDetections,
             '/get_detections',
             self.get_detections_callback
         )
+
+
+
         self.pipeline = dai.Pipeline()
         self.setup_pipeline()
         self.start_device()
 
+    def is_roi_outside(self, roi, frame):
+        (x1, y1), (x2, y2) = roi
+        h, w = frame.shape[:2]
+        return x1 < 0 or y1 < 0 or x2 > w or y2 > h or x1 >= x2 or y1 >= y2
 
     def full_reset(self):
-
         self.state = ROI1_ACTIVE
+
         self.roi1_class = "none"
         self.roi2_class = "none"
         self.roi3_class = "none"
+
         self.roi_count = 0
         self.roi_last = None
         self.roi_start_time = time.monotonic()
@@ -120,6 +199,12 @@ class OAKDDetectorNode(Node):
         self.color_last = None
         self.color_start_time = time.monotonic()
 
+        self.stage11_locked = [False] * 6
+        self.stage11_result = ["no"] * 6
+        self.stage11_state  = 0
+        self.stage11_count  = 0
+        self.stage11_last   = None
+        self.stage11_start_time = time.monotonic()
 
     def setup_pipeline(self):
         cam = self.pipeline.create(dai.node.ColorCamera)
@@ -136,190 +221,419 @@ class OAKDDetectorNode(Node):
         ctrl.setChromaDenoise(4)
         cam.initialControl.set(ctrl.get())
 
+        monoL = self.pipeline.create(dai.node.MonoCamera)
+        monoR = self.pipeline.create(dai.node.MonoCamera)
+
+        monoL.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+        monoR.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+        monoL.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        monoR.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+
+        stereo = self.pipeline.create(dai.node.StereoDepth)
+        monoL.out.link(stereo.left)
+        monoR.out.link(stereo.right)
+
+        stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
+        stereo.setLeftRightCheck(True)
+        stereo.setSubpixel(True)
+
+        xoutDepth = self.pipeline.create(dai.node.XLinkOut)
+        xoutDepth.setStreamName("depth")
+        stereo.depth.link(xoutDepth.input)
+
         xout = self.pipeline.create(dai.node.XLinkOut)
         xout.setStreamName("rgb")
         cam.video.link(xout.input)
 
     def start_device(self):
         self.device = dai.Device(self.pipeline)
-
         calib = self.device.readCalibration()
         w, h = 1920, 1080
 
-        K = np.array(calib.getCameraIntrinsics(
-            dai.CameraBoardSocket.RGB, w, h))
-        D = np.array(calib.getDistortionCoefficients(
-            dai.CameraBoardSocket.RGB))
+        K = np.array(calib.getCameraIntrinsics(dai.CameraBoardSocket.RGB, w, h))
+        D = np.array(calib.getDistortionCoefficients(dai.CameraBoardSocket.RGB))
+        newK, _ = cv2.getOptimalNewCameraMatrix(K, D, (w,h), alpha=0)
+        self.map1, self.map2 = cv2.initUndistortRectifyMap(K,D,np.eye(3),newK,(w,h),cv2.CV_16SC2)
 
-        newK, _ = cv2.getOptimalNewCameraMatrix(K, D, (w, h), alpha=0)
-
-        self.map1, self.map2 = cv2.initUndistortRectifyMap(
-            K, D, np.eye(3), newK, (w, h), cv2.CV_16SC2
-        )
-
-        self.queue = self.device.getOutputQueue(
-            "rgb", maxSize=4, blocking=False
-        )
+        self.queue = self.device.getOutputQueue("rgb", maxSize=4, blocking=False)
+        self.depth_queue = self.device.getOutputQueue("depth", maxSize=4, blocking=False)
 
         self.create_timer(0.04, self.processing_loop)
 
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _sample_depth(self, depthFrame, roi):
+        """Return (depth_m_left, depth_m_right) for a given ROI centre."""
+        (x1, y1), (x2, y2) = roi
+        cx = (x1 + x2) // 2
+        cy = (y1 + y2) // 2
+        roi_width = x2 - x1
+        offset = int(0.10 * roi_width)
+
+        dh, dw = depthFrame.shape
+        xl = max(0, min(dw - 1, cx - offset))
+        xr = max(0, min(dw - 1, cx + offset))
+        cy = max(0, min(dh - 1, cy))
+
+        dl = depthFrame[cy, xl]
+        dr = depthFrame[cy, xr]
+        return (dl / 1000.0 if dl > 0 else 0.0,
+                dr / 1000.0 if dr > 0 else 0.0)
+
+    def _detect_target_color(self, roi_img, target_color, blue_threshold, red_threshold):
+        """
+        Stage 11 color check. `target_color` ("red" or "blue") selects which
+        color counts as "yes"; the opposite color counts as "blocked".
+        Returns "no" if neither is found, or if target_color is invalid.
+        The target color is checked first — if both somehow trigger, target wins.
+        """
+        if target_color == "red":
+            yes_range, yes_threshold = RED_RANGE, red_threshold
+            blocked_range, blocked_threshold = BLUE_RANGE, blue_threshold
+        elif target_color == "blue":
+            yes_range, yes_threshold = BLUE_RANGE, blue_threshold
+            blocked_range, blocked_threshold = RED_RANGE, red_threshold
+        else:
+            return "no"
+
+        yes_detected = self.detect_color_ratio(
+            roi_img,
+            colorA_range=yes_range,
+            threshold=yes_threshold,
+            mode="percent"
+        )
+        if yes_detected:
+            return "yes"
+
+        blocked_detected = self.detect_color_ratio(
+            roi_img,
+            colorA_range=blocked_range,
+            threshold=blocked_threshold,
+            mode="percent"
+        )
+        if blocked_detected:
+            return "blocked"
+
+        return "no"
+
+    # ── main processing loop ──────────────────────────────────────────────────
 
     def processing_loop(self):
-
         msg = self.queue.tryGet()
-        if msg is None:
+        depth_msg = self.depth_queue.tryGet()
+
+        if msg is None or depth_msg is None:
             return
 
         frame = msg.getCvFrame()
+        depthFrame = depth_msg.getCvFrame()
+
         frame = cv2.remap(frame, self.map1, self.map2, cv2.INTER_LINEAR)
+        # ArUco detection — publish True if marker ID 1 is visible
+        corners, ids, _ = self.aruco_detector.detectMarkers(frame)
+        aruco_msg = Bool()
+        aruco_msg.data = ids is not None and 1 in ids.flatten()
+        self.aruco_pub.publish(aruco_msg)
 
         if self.stage <= 4:
-
-            if time.monotonic() - self.roi_start_time > ROI_TIMEOUT:
-                self.advance_state()
+            if self.stage == 4 and self.state == ROI2_ACTIVE:
+                self.roi2_class = "none"
+                self.state = ROI3_ACTIVE
+                self.roi_start_time = time.monotonic()
                 return
+            elapsed = time.monotonic() - self.roi_start_time
+            if elapsed > ROI_TIMEOUT:
+                self.advance_state()
 
-            if self.state == ROI1_ACTIVE:
-                roi = ROI_1[self.stage - 1]
-            elif self.state == ROI2_ACTIVE:
-                roi = ROI_2[self.stage - 1]
             else:
-                roi = ROI_3[self.stage - 1]
+                roi = {ROI1_ACTIVE: ROI_1, ROI2_ACTIVE: ROI_2, ROI3_ACTIVE: ROI_3}[self.state][self.stage-1]
 
-            roi_img = crop_roi(frame, roi)
-            results = self.model(roi_img, verbose=False)
-
-            detected = None
-            for r in results:
-                detected = self.get_best_class(r)
-
-            if detected is None:
-                self.roi_count = 0
-                self.roi_last = None
-            else:
-                if detected == self.roi_last:
-                    self.roi_count += 1
-                else:
-                    self.roi_last = detected
-                    self.roi_count = 1
-
-                if self.roi_count >= LOCK_FRAMES:
+                if self.is_roi_outside(roi, frame):
                     if self.state == ROI1_ACTIVE:
-                        self.roi1_class = detected
+                        self.roi1_class = "outside"
                         self.state = ROI2_ACTIVE
                     elif self.state == ROI2_ACTIVE:
-                        self.roi2_class = detected
+                        self.roi2_class = "outside"
                         self.state = ROI3_ACTIVE
                     else:
-                        self.roi3_class = detected
+                        self.roi3_class = "outside"
                         self.state = ROI1_ACTIVE
-
                     self.roi_count = 0
                     self.roi_last = None
                     self.roi_start_time = time.monotonic()
+                    return
+
+                roi_img = crop_roi(frame, roi)
+
+                (x1,y1),(x2,y2) = roi
+
+                cx = (x1 + x2) // 2
+                cy = (y1 + y2) // 2
+
+                roi_width = (x2 - x1)
+                offset = int(0.10 * roi_width)
+
+                x_left = cx - offset
+                x_right = cx + offset
+
+                h, w = depthFrame.shape
+                x_left = max(0, min(w-1, x_left))
+                x_right = max(0, min(w-1, x_right))
+                cy = max(0, min(h-1, cy))
+
+                depth_mm_left = depthFrame[cy, x_left]
+                depth_mm_right = depthFrame[cy, x_right]
+
+                depth_m_left = depth_mm_left / 1000.0 if depth_mm_left > 0 else 0
+                depth_m_right = depth_mm_right / 1000.0 if depth_mm_right > 0 else 0
+
+                roi_index = self.state - 1
+                target_depth = DEPTH_TARGETS_FOR_FOREST[self.stage-1][roi_index]
+
+                depth_valid = (
+                    abs(depth_m_left - target_depth) <= DEPTH_TOLERANCE_FOR_FOREST
+                    or
+                    abs(depth_m_right - target_depth) <= DEPTH_TOLERANCE_FOR_FOREST
+                )
+
+                detected = None
+                if depth_valid:
+                    results = self.model(roi_img, verbose=False)
+                    for r in results:
+                        detected = self.get_best_class(r)
+
+                if detected is None:
+                    self.roi_count = 0
+                    self.roi_last = None
+                else:
+                    if detected == self.roi_last:
+                        self.roi_count += 1
+                    else:
+                        self.roi_last = detected
+                        self.roi_count = 1
+                    if self.roi_count >= LOCK_FRAMES:
+                        if self.state == ROI1_ACTIVE:
+                            self.roi1_class = detected
+                            self.state = ROI2_ACTIVE
+                        elif self.state == ROI2_ACTIVE:
+                            self.roi2_class = detected
+                            self.state = ROI3_ACTIVE
+                        else:
+                            self.roi3_class = detected
+                            self.state = ROI1_ACTIVE
+                        self.roi_count = 0
+                        self.roi_last = None
+                        self.roi_start_time = time.monotonic()
 
         elif 5 <= self.stage <= 10:
 
-            rois = [self.get_dynamic_color_roi(i)
-                    for i in range(COLOR_ROI_COUNT)]
+            rois = MANUAL_MARTIAL_ROIS.get(self.stage, [None]*COLOR_ROI_COUNT)
 
             active_roi = rois[self.color_state]
 
-            if active_roi is None:
-                self.advance_color_state()
-
-            elif not self.color_locked[self.color_state]:
-
-                if time.monotonic() - self.color_start_time > ROI_TIMEOUT_SECOND:
+            if active_roi is not None and not self.color_locked[self.color_state]:
+                if self.is_roi_outside(active_roi, frame):
+                    self.color_result[self.color_state] = "outside"
+                    self.color_locked[self.color_state] = True
                     self.advance_color_state()
                 else:
-                    roi_img = crop_roi(frame, active_roi)
-                    detected = self.detect_red_color(roi_img)
+                    elapsed = time.monotonic() - self.color_start_time
 
-                    if detected == self.color_last:
-                        self.color_count += 1
-                    else:
-                        self.color_last = detected
-                        self.color_count = 1
-
-                    if self.color_count >= LOCK_FRAMES and detected:
-                        self.color_result[self.color_state] = "yes"
-                        self.color_locked[self.color_state] = True
+                    if elapsed > ROI_TIMEOUT:
                         self.advance_color_state()
+
+                    else:
+                        (x1,y1),(x2,y2) = active_roi
+
+                        cx = (x1 + x2) // 2
+                        cy = (y1 + y2) // 2
+
+                        roi_width = (x2 - x1)
+                        offset = int(0.10 * roi_width)
+
+                        x_left = cx - offset
+                        x_right = cx + offset
+
+                        h, w = depthFrame.shape
+                        x_left = max(0, min(w-1, x_left))
+                        x_right = max(0, min(w-1, x_right))
+                        cy = max(0, min(h-1, cy))
+
+                        depth_mm_left = depthFrame[cy, x_left]
+                        depth_mm_right = depthFrame[cy, x_right]
+
+                        depth_m_left = depth_mm_left / 1000.0 if depth_mm_left > 0 else 0
+                        depth_m_right = depth_mm_right / 1000.0 if depth_mm_right > 0 else 0
+
+                        target_depth = DEPTH_TARGETS_FOR_MARTIAL[self.stage][self.color_state]
+
+                        depth_valid = (
+                            abs(depth_m_left - target_depth) <= DEPTH_TOLERANCE_FOR_MARTIAL
+                            or
+                            abs(depth_m_right - target_depth) <= DEPTH_TOLERANCE_FOR_MARTIAL
+                        )
+
+                        roi_img = crop_roi(frame, active_roi)
+
+                        if roi_img is not None and roi_img.size > 0 and depth_valid:
+                            detected = self.detect_color_ratio(
+                                roi_img,
+                                colorA_range=SPEARHEAD_RANGE,
+                                threshold=0.1,
+                                mode="percent"
+                            )
+                        else:
+                            detected = False
+
+                        if detected == self.color_last:
+                            self.color_count += 1
+                        else:
+                            self.color_last = detected
+                            self.color_count = 1
+
+                        if self.color_count >= LOCK_FRAMES and detected:
+                            self.color_result[self.color_state] = "yes"
+                            self.color_locked[self.color_state] = True
+                            self.advance_color_state()
+
+        elif self.stage == 11:
+            # ── Stage 11: six independently-locked ROIs, red/blue colour ratio ──
+            # `self.stage11_color` (set via request.color: "red" or "blue")
+            # selects which color returns "yes" and which returns "blocked".
+
+            active_idx = self.stage11_state
+
+            # Only process the currently active (unlocked) ROI
+            if active_idx < 6 and not self.stage11_locked[active_idx]:
+                active_roi = STAGE11_ROIS[active_idx]
+
+                if self.is_roi_outside(active_roi, frame):
+                    self.stage11_result[active_idx] = "outside"
+                    self.stage11_locked[active_idx] = True
+                    self._advance_stage11()
+                else:
+                    elapsed = time.monotonic() - self.stage11_start_time
+
+                    if elapsed > ROI_TIMEOUT:
+                        # Timed out without a definitive detection — move on
+                        self._advance_stage11()
+                    else:
+                        depth_m_left, depth_m_right = self._sample_depth(depthFrame, active_roi)
+                        target_depth = STAGE11_DEPTH_TARGETS[active_idx]
+
+                        depth_valid = (
+                            abs(depth_m_left  - target_depth) <= STAGE11_DEPTH_TOLERANCE
+                            or
+                            abs(depth_m_right - target_depth) <= STAGE11_DEPTH_TOLERANCE
+                        )
+
+                        roi_img = crop_roi(frame, active_roi)
+
+                        if roi_img is not None and roi_img.size > 0 and depth_valid:
+                            detected = self._detect_target_color(
+                                roi_img,
+                                target_color=self.stage11_color,
+                                blue_threshold=STAGE11_BLUE_THRESHOLD,
+                                red_threshold=STAGE11_RED_THRESHOLD
+                            )
+                        else:
+                            detected = "no"
+
+                        if detected == self.stage11_last:
+                            self.stage11_count += 1
+                        else:
+                            self.stage11_last = detected
+                            self.stage11_count = 1
+
+                        # Latch on yes or blocked; ignore transient "no"
+                        if self.stage11_count >= LOCK_FRAMES and detected != "no":
+                            self.stage11_result[active_idx] = detected
+                            self.stage11_locked[active_idx] = True
+                            self._advance_stage11()
 
     def advance_state(self):
         self.roi_count = 0
         self.roi_last = None
         self.roi_start_time = time.monotonic()
-        self.state = {
-            ROI1_ACTIVE: ROI2_ACTIVE,
-            ROI2_ACTIVE: ROI3_ACTIVE,
-            ROI3_ACTIVE: ROI1_ACTIVE
-        }[self.state]
+        self.state = {ROI1_ACTIVE: ROI2_ACTIVE, ROI2_ACTIVE: ROI3_ACTIVE, ROI3_ACTIVE: ROI1_ACTIVE}[self.state]
 
     def advance_color_state(self):
         self.color_count = 0
         self.color_last = None
         self.color_start_time = time.monotonic()
-        self.color_state = (self.color_state + 1) % COLOR_ROI_COUNT
+        self.color_state = (self.color_state+1)%COLOR_ROI_COUNT
 
-    def get_dynamic_color_roi(self, idx):
-        shift = int((self.stage - 7.5) * ROI_SHIFT_CONST)
-
-        x1 = COLOR_ROI_X_START + shift + idx * COLOR_ROI_X_GAP
-        y1 = COLOR_ROI_Y
-        x2 = x1 + COLOR_ROI_SIZE
-        y2 = y1 + COLOR_ROI_SIZE
-
-        if x1 < 0 or y1 < 0 or x2 > 1920 or y2 > 1080:
-            return None
-
-        return ((x1, y1), (x2, y2))
-
-    def detect_red_color(self, roi_img):
-        hsv = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
-        lower = np.array([0, 120, 70])
-        upper = np.array([10, 255, 255])
-        mask = cv2.inRange(hsv, lower, upper)
-        ratio = np.count_nonzero(mask) / mask.size
-        return ratio >= COLOR_PIXEL_THRESHOLD
+    def _advance_stage11(self):
+        self.stage11_count = 0
+        self.stage11_last  = None
+        self.stage11_start_time = time.monotonic()
+        self.stage11_state = (self.stage11_state + 1) % 6
 
     def get_best_class(self, r):
-        if r.obb is None or len(r.obb) == 0:
+        if r.obb is None or len(r.obb)==0:
             return None
         confs = r.obb.conf.cpu().numpy()
         classes = r.obb.cls.cpu().numpy().astype(int)
         return self.model.names[classes[np.argmax(confs)]]
 
-    def get_detections_callback(self, request, response):
+    def detect_color_ratio(self, roi_img, colorA_range, colorB_range=None, threshold=0.5, mode="ratio"):
+        hsv = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
 
+        lowerA, upperA = colorA_range
+        maskA = cv2.inRange(hsv, np.array(lowerA), np.array(upperA))
+        pixelsA = np.count_nonzero(maskA)
+
+        total_pixels = roi_img.shape[0] * roi_img.shape[1]
+
+        if mode == "pixel":
+            return pixelsA >= threshold
+
+        if mode == "percent":
+            ratio = pixelsA / total_pixels
+            return ratio >= threshold
+
+        if colorB_range is None:
+            return False
+
+        lowerB, upperB = colorB_range
+        maskB = cv2.inRange(hsv, np.array(lowerB), np.array(upperB))
+        pixelsB = np.count_nonzero(maskB)
+
+        if pixelsB == 0:
+            return False
+
+        ratio = pixelsA / pixelsB
+        return ratio >= threshold
+
+    def get_detections_callback(self, request, response):
         if request.reset:
             self.full_reset()
-
         if self.last_stage != request.stage:
             self.full_reset()
-
-            # Set cycling start based on stage
-            start_index = (request.stage - 5) % 6
+            start_index = (request.stage-5)%6
             self.color_state = start_index
-
+        if request.color:
+            self.stage11_color = request.color
         self.stage = request.stage
         self.last_stage = request.stage
 
         response.roi1_class = self.roi1_class
         response.roi2_class = self.roi2_class
         response.roi3_class = self.roi3_class
-
         response.roi1_martial = self.color_result[0]
         response.roi2_martial = self.color_result[1]
         response.roi3_martial = self.color_result[2]
         response.roi4_martial = self.color_result[3]
         response.roi5_martial = self.color_result[4]
         response.roi6_martial = self.color_result[5]
-
+        response.stage11_roi1 = self.stage11_result[0]
+        response.stage11_roi2 = self.stage11_result[1]
+        response.stage11_roi3 = self.stage11_result[2]
+        response.stage11_roi4 = self.stage11_result[3]
+        response.stage11_roi5 = self.stage11_result[4]
+        response.stage11_roi6 = self.stage11_result[5]
         response.success = True
         response.status = "completed"
-
         return response
 
 
@@ -332,5 +646,5 @@ def main(args=None):
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__=='__main__':
     main()
