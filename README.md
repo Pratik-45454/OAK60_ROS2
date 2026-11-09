@@ -101,15 +101,21 @@ The system integrates three main components: OAK-D camera input, ROS2 node infra
 </p>
 image: OAK60 prow
 
+
+
 <p align="center">
   <img src="docs/images/4.jpg" width="700" alt="cybergear bldcs">
 </p>
 cybergear bldcs
 
+
+
 <p align="center">
   <img src="docs/images/6.jpg" width="700" alt="waveshare usb to can">
 </p>
 waveshare usb to can
+
+
 - AK-60 Motor with CAN interface
 - USB-CAN Adapter (WaveShare CH341 compatible)
 - Compatible compute platform (Jetson, x86-64, ARM64)
