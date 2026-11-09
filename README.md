@@ -72,10 +72,13 @@ Perfect for robotics applications including robotic arms, picking systems, and a
 <p align="center">
   <img src="docs/images/1.jpg" width="700" alt="vision pipeline">
 </p>
+image: vision pipeline
+
 
 <p align="center">
   <img src="docs/images/5.jpg" width="700" alt="can motor pipeline">
 </p>
+image: can motor pipeline
 
 The system integrates three main components: OAK-D camera input, ROS2 node infrastructure with detection and motor control services, and YOLO models for inference. The architecture follows a modular design with state machine logic for ROI management.
 
@@ -96,10 +99,17 @@ The system integrates three main components: OAK-D camera input, ROS2 node infra
 <p align="center">
   <img src="docs/images/2.jpg" width="700" alt="OAK60 prow">
 </p>
+image: OAK60 prow
 
 <p align="center">
   <img src="docs/images/4.jpg" width="700" alt="cybergear bldcs">
 </p>
+cybergear bldcs
+
+<p align="center">
+  <img src="docs/images/6.jpg" width="700" alt="waveshare usb to can">
+</p>
+waveshare usb to can
 - AK-60 Motor with CAN interface
 - USB-CAN Adapter (WaveShare CH341 compatible)
 - Compatible compute platform (Jetson, x86-64, ARM64)
