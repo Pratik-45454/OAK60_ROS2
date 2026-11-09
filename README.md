@@ -61,9 +61,21 @@ Perfect for robotics applications including robotic arms, picking systems, and a
 - **Multi-Node Support**: Modular nodes for detection and control
 - **Debug Variants**: Debug-enabled nodes with enhanced logging
 
+<p align="center">
+  <img src="docs/images/3.jpg" width="700" alt="Trained model on oracle bone characters">
+</p>
+
 ---
 
 ## System Architecture
+
+<p align="center">
+  <img src="docs/images/1.jpg" width="700" alt="vision pipeline">
+</p>
+
+<p align="center">
+  <img src="docs/images/5.jpg" width="700" alt="can motor pipeline">
+</p>
 
 The system integrates three main components: OAK-D camera input, ROS2 node infrastructure with detection and motor control services, and YOLO models for inference. The architecture follows a modular design with state machine logic for ROI management.
 
@@ -81,6 +93,13 @@ The system integrates three main components: OAK-D camera input, ROS2 node infra
 
 ### Hardware
 - OAK-D Stereo Camera (USB 3.1)
+<p align="center">
+  <img src="docs/images/2.jpg" width="700" alt="OAK60 prow">
+</p>
+
+<p align="center">
+  <img src="docs/images/4.jpg" width="700" alt="cybergear bldcs">
+</p>
 - AK-60 Motor with CAN interface
 - USB-CAN Adapter (WaveShare CH341 compatible)
 - Compatible compute platform (Jetson, x86-64, ARM64)
@@ -474,26 +493,7 @@ colcon build --event-handlers console_direct+
 - [OAK-D DepthAI SDK](https://docs.luxonis.com/projects/api/en/latest/)
 - [Ultralytics YOLO](https://docs.ultralytics.com/)
 
----
 
-## Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### Code Standards
-- Follow PEP 8 style guide
-- Add docstrings to all functions
-- Include type hints where possible
-- Update tests for new features
-- Maintain backward compatibility
-
----
 
 ## License
 
@@ -503,7 +503,7 @@ This project is licensed under the **Apache License 2.0** - see the [LICENSE](LI
 
 ## Authors & Maintainers
 
-- **Project Lead**: Pratik Gyawali
+- **Project Lead**: Pratik Gyawali 
 
 ---
 
@@ -515,5 +515,4 @@ For questions, issues, or suggestions:
 
 ---
 
-**Last Updated**: April 2026  
-**Status**: Active Development
+
